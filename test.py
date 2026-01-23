@@ -1,13 +1,14 @@
 # main.py
 import os
 import datetime
+import config
+import sys
+import time
 from src.browser_handler import BrowserManager
 from src.network_sniffer import NetworkTracker
 from src.page_analyzer import PageParser
 from src.report_writer import DocxGenerator
-import config
 
-import config
 
 
 def main():
@@ -27,6 +28,18 @@ def main():
     else:
         print(f"\n🎯 기본값 사용: {config.TARGET_URL}")
 
+    use_login = input("로그인이 필요한 페이지인가요? (y/n) [기본 : n]").strip().lower()
+
+    login_url = ("")
+    if use_login == 'y':
+        login_url = input("로그인 페이지 URL을 입력하세요").strip()
+        if not login_url.startswith("http"):
+            login_url = "https://" + login_url
+            print("로그인을 위해 브라우저 화면을 표시합니다.")
+            config.HEADLESS_MODE = False
+
+
+
     # 모듈 초기화
     browser_mgr = BrowserManager()
     network_tracker = NetworkTracker()
@@ -42,11 +55,24 @@ def main():
         # 1. 브라우저 실행
         page = browser_mgr.launch_browser()
 
+        # 1-1. 로그인
+        if use_login == 'y':
+            print(f"\n 로그인 페이지로 이동합니다")
+            browser_mgr.navigate_to(login_url)
+
+            print("열린 브라우저에서 로그인을 완료한 뒤")
+            input("로그인 완료 시 엔터를 누르세요")
+
         # 2. 네트워크 추적 시작
         network_tracker.start_tracing(page)
 
         # 3. 사이트 접속 및 로딩 대기
         browser_mgr.navigate_to(config.TARGET_URL)
+
+        if use_login == 'y':
+            network_tracker.start_tracing(page)
+            page.reload()
+            page.wait_for_load_state("networkidle")
 
         # 4. 화면 캡처
         screenshot_path = browser_mgr.capture_screen(screenshot_filename)
