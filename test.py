@@ -8,6 +8,7 @@ from src.browser_handler import BrowserManager
 from src.network_sniffer import NetworkTracker
 from src.page_analyzer import PageParser
 from src.report_writer import DocxGenerator
+from src.whois_analyzer import WhoisAnalyzer
 
 
 
@@ -45,6 +46,7 @@ def main():
     network_tracker = NetworkTracker()
     page_parser = PageParser()
     report_writer = DocxGenerator()
+    whois_analyzer = WhoisAnalyzer()
 
     # 타임스탬프로 파일명 생성 (예: report_20231025_120000.docx)
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -89,6 +91,14 @@ def main():
         # 6. 네트워크 로그 회수
         api_logs = network_tracker.get_api_summary()
 
+        # 6-1. WHOIS 분석
+        whois_results = []
+        if api_logs:
+            print("\n[Main] Analyzing IP WHOIS information...")
+            whois_results = whois_analyzer.analyze_ips(api_logs)
+
+        else:
+            print("\n[Main] No IPS found to analyze")
 
         report_writer.save_file(report_filename)
         # 7. 보고서 작성
@@ -98,7 +108,8 @@ def main():
             screenshot_path=screenshot_path,
             page_data=analysis_result,
             api_logs=api_logs,
-            interactive_elements = interactive_data  # 데이터 전달
+            interactive_elements = interactive_data,
+            whois_data = whois_results   # 데이터 전달
         )
         report_writer.save_file(report_filename)
 

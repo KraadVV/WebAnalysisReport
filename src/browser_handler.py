@@ -97,15 +97,23 @@ class BrowserManager:
         elem_dir = os.path.join(config.SCREENSHOT_DIR, "elements")
         os.makedirs(elem_dir, exist_ok=True)
 
+        self._smooth_scroll()
+        time.sleep(2)
+
         interactive_data = []
 
+        selectors = "a, button, input[type='submit'], input[type='button'], [role='button'], [onclick]"
         # 분석 대상: a 태그, button 태그, input(submit/button) 태그
         # 너무 많을 수 있으므로 상위 20개 정도만 제한하거나, 특정 크기 이상인 것만 필터링 가능
-        elements = self.page.query_selector_all("a, button, input[type='submit'], input[type='button']")
+        elements = self.page.query_selector_all(selectors)
+
+        print(f"[Browser] Found {len(elements)} potential elements. Filtering...")
 
         count = 0
+        saved_hashes = set()
+
         for i, elem in enumerate(elements):
-            if count >= 20: break  # 보고서 용량 문제로 최대 20개까지만 분석 (조절 가능)
+            if count >= 30: break  # 보고서 용량 문제로 최대 20개까지만 분석 (조절 가능)
 
             try:
                 # 1. 요소가 화면에 보이는지 확인 (안 보이면 스킵)
@@ -113,33 +121,41 @@ class BrowserManager:
                     continue
 
                 # 2. 텍스트 추출
+                box = elem.bounding_box()
+                if not box or box['width'] < 10 or box['height'] < 10:
+                    continue
+
                 text = elem.inner_text().strip()
                 if not text:
                     # 텍스트가 없으면(이미지 버튼 등) 태그명이나 ID로 대체
-                    text = f"[{elem.get_attribute('id') or elem.get_attribute('class') or 'Image Button'}]"
+                    text = elem.get_attribute("aria-label") or ""
+                    if not text:
+                        img = elem.query_selector("img")
+                        if img:
+                            text = img.get_attribute("alt") or "[기타 이미지]"
+                        else:
+                            text = f"[{elem.get_attribute('class') or elem.get_attribute('id') or 'Unknown Button'}]"
+
+                text = text[:50].replace("\n", " ")
 
                 # 3. 동작(Action) 정보 추출
                 tag_name = elem.evaluate("el => el.tagName").lower()
-                action_info = "Unknown"
+                action_info = "Click Action"
 
-                if tag_name == "a":
-                    action_info = f"Link to: {elem.get_attribute('href')}"
-                elif tag_name == "button" or tag_name == "input":
-                    # onclick 이벤트가 있는지, 혹은 form submit인지 확인
-                    onclick = elem.get_attribute('onclick')
-                    msg_type = elem.get_attribute('type')
-                    if onclick:
-                        action_info = f"JS Event: {onclick[:30]}..."  # 너무 길면 자름
-                    elif msg_type == "submit":
-                        # 부모 폼의 action 찾기
-                        parent_form = elem.evaluate_handle("el => el.closest('form')")
-                        if parent_form:
-                            form_action = parent_form.get_attribute("action") or "Current Page"
-                            action_info = f"Form Submit to: {form_action}"
-                        else:
-                            action_info = "Submit (No Form)"
-                    else:
-                        action_info = "Button Click"
+                href = elem.get_attribute('href')
+                onclick = elem.get_attribute('onclick')
+
+                if href and href != "#":
+                    action_info = f"Link : {href[:60]}"
+                elif onclick:
+                    action_info = f"JS: {onclick[:30]}"
+                elif tag_name == "button" or elem.get_attribute("role") == "button":
+                    action_info = "Button Clock (Script)"
+
+                unique_key = f"{text}-{action_info}"
+                if unique_key in saved_hashes:
+                    continue
+                saved_hashes.add(unique_key)
 
                 # 4. 요소 개별 스크린샷 촬영
                 # 파일명 안전하게 변환
@@ -161,7 +177,7 @@ class BrowserManager:
             except Exception as e:
                 # 요소가 겹치거나 사라진 경우 에러 무시
                 continue
-
+        print(f"[Browser] Successfully extracted {len(interactive_data)} elements.")
         return interactive_data
 
     def get_html_source(self):

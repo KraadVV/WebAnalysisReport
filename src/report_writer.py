@@ -17,7 +17,7 @@ class DocxGenerator:
         font.name = 'Malgun Gothic'  # 한글 폰트 설정 (시스템에 있어야 함)
         font.size = Pt(10)
 
-    def create_report(self, url, screenshot_path, page_data, api_logs, interactive_elements=None):
+    def create_report(self, url, screenshot_path, page_data, api_logs, interactive_elements=None, whois_data=None):
         """
         모든 데이터를 받아서 순서대로 문서에 작성합니다.
         """
@@ -103,8 +103,37 @@ class DocxGenerator:
         else:
             self.doc.add_paragraph("감지된 XHR/Fetch 요청이 없습니다.")
 
+        self.doc.add_page_break()
+        self.doc.add_heading('4. 서버 IP WHOIS 정보', level=1)
+        self.doc.add_paragraph("분석 과정에서 식별한 서버 IP의 소유자 정보 분석")
+
+        if whois_data:
+            #테이블 구조 : IP - 국가 - ISP - 할당 대역
+            table = self   .doc.add_table(rows=1, cols=4)
+            table.style = 'Table Grid'
+
+            hdr = table.rows[0].cells
+            hdr[0].text = 'IP Address'
+            hdr[1].text = '국가'
+            hdr[2].text = '소유 기관'
+            hdr[3].text = 'IP 대역'
+
+            for cell in hdr :
+                cell.width = Inches(1.5)
+
+            for info in whois_data:
+                row_cells = table.add_row().cells
+                row_cells[0].text = info['ip']
+                row_cells[1].text = info['country']
+                row_cells[2].text = info['org']
+                row_cells[3].text = info['cidr']
+
+            else :
+                self.doc.add_paragraph("조회된 WHOIS 정보 없음.")
+
+
         self.doc.add_page_break()  # 새 페이지에서 시작
-        self.doc.add_heading('4. 상호작용 요소 상세 분석', level=1)
+        self.doc.add_heading('5. 상호작용 요소 상세 분석', level=1)
         self.doc.add_paragraph("사용자가 클릭 가능한 주요 요소들의 시각적 형태와 연결 동작을 분석합니다.")
 
         if interactive_elements:
