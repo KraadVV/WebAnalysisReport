@@ -11,16 +11,17 @@ class DocxGenerator:
         self._setup_styles()
 
     def _setup_styles(self):
-        """문서의 기본 폰트나 스타일 설정 (선택사항)"""
+        '''문서의 기본 폰트나 스타일 설정 (선택사항)'''
         style = self.doc.styles['Normal']
         font = style.font
         font.name = 'Malgun Gothic'  # 한글 폰트 설정 (시스템에 있어야 함)
         font.size = Pt(10)
 
     def create_report(self, url, screenshot_path, page_data, api_logs, interactive_elements=None, whois_data=None):
-        """
-        모든 데이터를 받아서 순서대로 문서에 작성합니다.
-        """
+        '''
+        모든 데이터를 받아서 순서대로 문서에 작성.
+        '''
+
         # 1. 제목 및 기본 정보
         self.doc.add_heading(f'웹사이트 분석 보고서', 0)
 
@@ -44,6 +45,7 @@ class DocxGenerator:
         # 3. 기능 및 구조 분석
         self.doc.add_heading('2. 기능 및 구조 분석', level=1)
 
+        '''
         # 3-1. 주요 기능 추정
         self.doc.add_heading('2-1. 주요 기능 (추정)', level=2)
         features = page_data.get('guessed_features', [])
@@ -52,9 +54,11 @@ class DocxGenerator:
                 self.doc.add_paragraph(feat, style='List Bullet')
         else:
             self.doc.add_paragraph("특이 기능 발견되지 않음.")
+            
+        '''
 
         # 3-2. 구성 요소 요약
-        self.doc.add_heading('2-2. 구성 요소 요약', level=2)
+        self.doc.add_heading('구성 요소 요약', level=2)
         links = page_data.get('links', {})
         buttons = page_data.get('buttons', {})
 
@@ -109,7 +113,7 @@ class DocxGenerator:
 
         if whois_data:
             #테이블 구조 : IP - 국가 - ISP - 할당 대역
-            table = self   .doc.add_table(rows=1, cols=4)
+            table = self.doc.add_table(rows=1, cols=4)
             table.style = 'Table Grid'
 
             hdr = table.rows[0].cells
