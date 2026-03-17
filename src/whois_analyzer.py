@@ -1,6 +1,7 @@
 # src/whois_analyzer.py
 from ipwhois import IPWhois
 import time
+import ipaddress
 
 
 class WhoisAnalyzer:
@@ -18,9 +19,15 @@ class WhoisAnalyzer:
         unique_ips = set()
         for log in api_logs:
             ip = log.get('ip')
-            # IP가 없거나, 분석 실패('Unknown'), 혹은 로컬호스트 등은 제외
-            if ip and ip not in ['-', 'Unknown IP', '127.0.0.1'] and not ip.startswith('192.168.'):
-                unique_ips.add(ip)
+            if not ip or ip in ['-', 'Unknown IP']:
+                continue
+                
+            try:
+                ip_obj = ipaddress.ip_address(ip)
+                if not ip_obj.is_private and not ip_obj.is_loopback:
+                    unique_ips.add(ip)
+            except ValueError:
+                continue
 
         results = []
         total = len(unique_ips)
@@ -38,7 +45,7 @@ class WhoisAnalyzer:
 
                 # 필요한 정보만 추출
                 network = res.get('network', {})
-                if network is None: network = {}
+                network = network or {}
 
 
                 asn_desc = res.get('asn_description', 'N/A')  # ISP/기업명

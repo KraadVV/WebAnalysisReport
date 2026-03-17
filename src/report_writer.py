@@ -132,8 +132,8 @@ class DocxGenerator:
                 row_cells[2].text = info['org']
                 row_cells[3].text = info['cidr']
 
-            else :
-                self.doc.add_paragraph("조회된 WHOIS 정보 없음.")
+        else:
+            self.doc.add_paragraph("조회된 WHOIS 정보 없음.")
 
 
         self.doc.add_page_break()  # 새 페이지에서 시작

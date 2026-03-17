@@ -150,7 +150,7 @@ class BrowserManager:
                 elif onclick:
                     action_info = f"JS: {onclick[:30]}"
                 elif tag_name == "button" or elem.get_attribute("role") == "button":
-                    action_info = "Button Clock (Script)"
+                    action_info = "Button Click (Script)"
 
                 unique_key = f"{text}-{action_info}"
                 if unique_key in saved_hashes:
