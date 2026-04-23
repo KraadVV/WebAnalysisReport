@@ -9,6 +9,8 @@ from src.network_sniffer import NetworkTracker
 from src.page_analyzer import PageParser
 from src.report_writer import DocxGenerator
 from src.whois_analyzer import WhoisAnalyzer
+from src.osint_analyzer import OSINTAnalyzer
+from src.sns_analyzer import SNSAnalyzer
 
 
 
@@ -31,7 +33,7 @@ def main():
 
     use_login = input("로그인이 필요한 페이지인가요? (y/n) [기본 : n]").strip().lower()
 
-    login_url = ("")
+    login_url = ""
     if use_login == 'y':
         login_url = input("로그인 페이지 URL을 입력하세요").strip()
         if not login_url.startswith("http"):
@@ -47,6 +49,8 @@ def main():
     page_parser = PageParser()
     report_writer = DocxGenerator()
     whois_analyzer = WhoisAnalyzer()
+    osint_analyzer = OSINTAnalyzer()
+    sns_analyzer = SNSAnalyzer(api_keys=config.SNS_API_KEYS)
 
     # 타임스탬프로 파일명 생성 (예: report_20231025_120000.docx)
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -72,7 +76,6 @@ def main():
         browser_mgr.navigate_to(config.TARGET_URL)
 
         if use_login == 'y':
-            network_tracker.start_tracing(page)
             page.reload()
             page.wait_for_load_state("networkidle")
 
@@ -90,17 +93,35 @@ def main():
 
         # 6. 네트워크 로그 회수
         api_logs = network_tracker.get_api_summary()
+        all_resources = network_tracker.get_all_resources()
+        unique_ips = network_tracker.get_unique_ips()
+        resource_summary = network_tracker.get_resource_summary()
 
-        # 6-1. WHOIS 분석
+        # 6-1. WHOIS 분석 (모든 리소스 기반)
         whois_results = []
-        if api_logs:
+        if all_resources:
             print("\n[Main] Analyzing IP WHOIS information...")
-            whois_results = whois_analyzer.analyze_ips(api_logs)
-
+            whois_results = whois_analyzer.analyze_ips(all_resources)
         else:
-            print("\n[Main] No IPS found to analyze")
+            print("\n[Main] No IPs found to analyze")
 
-        report_writer.save_file(report_filename)
+        # 6-2. OSINT 분석
+        print("\n[Main] Performing OSINT analysis...")
+        osint_results = osint_analyzer.analyze_domain(config.TARGET_URL)
+        
+        # 6-3. HTML에서 연락처 및 기술 정보 추출
+        osint_results['contacts'] = osint_analyzer.extract_contacts_from_html(html_source)
+        osint_results['technologies'] = osint_analyzer.detect_technologies(html_source)
+        
+        # 6-4. 심화 SNS 분석
+        print("\n[Main] Performing deep SNS analysis...")
+        sns_results = sns_analyzer.analyze_sns_presence(
+            html_source, 
+            config.TARGET_URL,
+            validate_links=config.SNS_VALIDATE_LINKS,
+            fetch_metadata=config.SNS_FETCH_METADATA
+        )
+
         # 7. 보고서 작성
         print("[Main] Generating report...")
         report_writer.create_report(
@@ -108,8 +129,12 @@ def main():
             screenshot_path=screenshot_path,
             page_data=analysis_result,
             api_logs=api_logs,
-            interactive_elements = interactive_data,
-            whois_data = whois_results   # 데이터 전달
+            interactive_elements=interactive_data,
+            whois_data=whois_results,
+            osint_data=osint_results,
+            unique_ips=unique_ips,
+            resource_summary=resource_summary,
+            sns_data=sns_results
         )
         report_writer.save_file(report_filename)
 

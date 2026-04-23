@@ -6,23 +6,45 @@ This Python-based tool automates the process of analyzing websites and generatin
 
 ## Features
 
+### Core Analysis
 -   **Automated Browser Interaction:** Uses Playwright to launch a browser, navigate to specified URLs, handle logins, and capture full-page screenshots.
--   **Network Traffic Analysis:** Tracks network requests (API calls, resources) using Playwright's built-in network interception capabilities.
+-   **Comprehensive Network Traffic Analysis:** Tracks ALL network requests (API calls, images, CSS, JS, fonts, media, websockets) using Playwright's built-in network interception.
 -   **HTML Structure Parsing:** Employs BeautifulSoup to parse HTML source code and extract key elements like titles, meta descriptions, links, and input fields.
 -   **Interactive Element Detection:** Identifies and captures screenshots of interactive elements like buttons and links, along with their associated actions.
--   **WHOIS Analysis:** Performs WHOIS lookups on server IPs to gather ownership and geographic information.
--   **Customizable Reporting:** Generates well-formatted DOCX reports using python-docx, including screenshots, tables, and descriptive text.
 -   **Login Handling:** Supports websites that require login by automating the navigation and allowing the user to manually complete the login process in a non-headless browser.
 -   **Lazy Loading Handling:** Implements smooth scrolling to ensure that all content, including lazy-loaded images, are captured in screenshots.
+
+### OSINT (Open Source Intelligence)
+-   **IP WHOIS Analysis:** Performs WHOIS lookups on ALL server IPs to gather ownership and geographic information.
+-   **Domain WHOIS:** Extracts registrar, creation/expiration dates, organization, and name servers.
+-   **DNS Records:** Queries A, MX, TXT, and NS records for comprehensive DNS analysis.
+-   **SSL/TLS Certificate Analysis:** Extracts certificate issuer, validity period, and Subject Alternative Names.
+-   **Technology Stack Detection:** Identifies frameworks (React, Vue, Angular), CMS (WordPress, Shopify), analytics tools, and programming languages.
+-   **Contact Information Extraction:** Finds emails, phone numbers, and physical addresses from page content.
+
+### Advanced SNS Analysis (NEW!)
+-   **18+ Platform Support:** Facebook, Twitter/X, Instagram, LinkedIn, YouTube, TikTok, Telegram, Discord, Reddit, GitHub, Medium, Pinterest, Twitch, VK, WhatsApp, WeChat, KakaoTalk, Line
+-   **Username Extraction:** Automatically parses usernames/handles from URLs
+-   **Link Validation:** Checks if social media links are active (HTTP status)
+-   **Profile Metadata:** Fetches public profile information (followers, bio, etc.)
+-   **Context Detection:** Identifies where links appear (header, footer, contact section)
+-   **Open Graph & Twitter Card Parsing:** Extracts social media metadata tags
+-   **Presence Scoring:** Calculates social media presence score (0-10)
+-   **Detailed Reporting:** Comprehensive SNS analysis with validation status and profile details
+
+### Reporting
+-   **Customizable DOCX Reports:** Generates well-formatted reports with 10 comprehensive sections including screenshots, tables, and descriptive text.
 
 ## Modules
 
 -   `browser_handler.py`: Manages browser launching, navigation, screenshot capturing, and interactive element extraction using Playwright.
--   `network_sniffer.py`: Tracks and summarizes network traffic using Playwright's request and response events.
+-   `network_sniffer.py`: Tracks and summarizes ALL network traffic (including images, CSS, JS, etc.) using Playwright's request and response events.
 -   `page_analyzer.py`: Parses HTML content using BeautifulSoup to extract information about page structure and functionality.
--   `report_writer.py`: Generates DOCX reports using python-docx, incorporating data from other modules.
+-   `report_writer.py`: Generates comprehensive DOCX reports with 10 sections using python-docx.
 -   `whois_analyzer.py`: Analyzes IP addresses from network logs to extract WHOIS information.
--   `config.py`: Contains configurable parameters such as target URL, output directories, and browser settings.
+-   `osint_analyzer.py`: Performs domain WHOIS, DNS, SSL certificate analysis, and technology detection.
+-   `sns_analyzer.py`: **NEW!** Deep social media analysis with 18+ platform support, link validation, and profile metadata extraction.
+-   `config.py`: Contains configurable parameters such as target URL, output directories, browser settings, and SNS analysis options.
 -   `test.py`: Main script to coordinate the analysis process and generate the final report.
 
 ## Dependencies
@@ -31,18 +53,23 @@ This Python-based tool automates the process of analyzing websites and generatin
 -   beautifulsoup4
 -   python-docx
 -   ipwhois
+-   requests
+-   python-whois
+-   dnspython
 
-Install the dependencies using pip:
+Install all dependencies using pip:
 
 ```bash
-pip install playwright beautifulsoup4 python-docx ipwhois
+pip install -r requirements.txt
 ```
 
 You also need to install the Playwright browser binaries:
 
 ```bash
-playwright install
+playwright install chromium
 ```
+
+For detailed installation instructions, see [INSTALL.md](../INSTALL.md)
 
 ## Setup for Executable Distribution (PyInstaller)
 

@@ -24,3 +24,26 @@ SCREENSHOT_DIR = os.path.join(OUTPUT_DIR, "screenshots")
 
 # 폴더가 없으면 생성
 os.makedirs(SCREENSHOT_DIR, exist_ok=True)
+
+# SNS 분석 설정
+SNS_VALIDATE_LINKS = True  # 링크 유효성 검사 수행
+SNS_FETCH_METADATA = True  # 프로필 메타데이터 가져오기
+SNS_MAX_VALIDATE = 20      # 최대 검증할 링크 수
+SNS_MAX_METADATA = 10      # 최대 메타데이터 가져올 링크 수
+
+# 보고서 최적화 설정
+MAX_INTERACTIVE_ELEMENTS = 15  # 보고서에 표시할 최대 상호작용 요소 수
+FILTER_LANGUAGE_SELECTORS = True  # 언어/국가 선택 링크 필터링
+MAX_NETWORK_IPS = 15  # 네트워크 섹션에 표시할 최대 IP 수
+SHOW_SNS_IN_CONTACTS = False  # Section 9에 SNS 중복 표시 안 함 (Section 10에만)
+
+# SNS API Keys (선택사항 - 비워두면 기본 웹 스크래핑 사용)
+SNS_API_KEYS = {
+    'twitter_bearer_token': '',
+    'facebook_app_id': '',
+    'facebook_app_secret': '',
+    'youtube_api_key': '',
+    'reddit_client_id': '',
+    'reddit_client_secret': '',
+    'telegram_bot_token': ''
+}

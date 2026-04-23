@@ -21,6 +21,7 @@ class BrowserManager:
         print("[Browser] Launching browser...")
         self.playwright = sync_playwright().start()
 
+        # EXE 실행 시 커스텀 Chrome 경로 설정
         executable_path = None
         if getattr(sys, 'frozen', False):
             # EXE 실행 시 기준 경로
@@ -28,30 +29,19 @@ class BrowserManager:
             # USB 안의 browsers 폴더 경로 지정
             executable_path = os.path.join(base_dir, "chrome-win64", "chrome.exe")
 
-            if not os.path.exists(executable_path):
-                print(f"❌ 오류: 브라우저 파일을 찾을 수 없습니다.\n경로: {executable_path}")
-                # 파일이 없으면 그냥 진행해서(혹은 종료해서) 에러 메시지를 보게 함
+            if os.path.exists(executable_path):
+                print(f"[Browser] Using custom Chrome: {executable_path}")
+            else:
+                print(f"⚠️ Warning: Custom Chrome not found at {executable_path}")
+                print("[Browser] Falling back to Playwright's bundled Chromium...")
+                executable_path = None  # Playwright will use bundled Chromium
 
-            # launch 옵션에 executable_path 추가
-            self.browser = self.playwright.chromium.launch(
-                headless=config.HEADLESS_MODE,
-                executable_path=executable_path  # 여기가 핵심! None이면 시스템 기본값 사용
-            )
-
-            self.context = self.browser.new_context(
-                viewport=config.VIEWPORT_SIZE,
-                user_agent=config.USER_AGENT
-            )
-
-            self.page = self.context.new_page()
-            print("[Browser] Browser launched successfully.")
-
-            return self.page
-
-
-        self.browser = self.playwright.chromium.launch(
-            headless=config.HEADLESS_MODE
-        )
+        # 브라우저 실행 (통합된 코드)
+        launch_options = {"headless": config.HEADLESS_MODE}
+        if executable_path:
+            launch_options["executable_path"] = executable_path
+        
+        self.browser = self.playwright.chromium.launch(**launch_options)
 
         # 뷰포트 및 User-Agent 설정
         self.context = self.browser.new_context(
@@ -87,6 +77,37 @@ class BrowserManager:
 
         return save_path
 
+    def _is_meaningful_element(self, text, href=''):
+        """의미 있는 상호작용 요소인지 판단 (언어 선택기 등 제외)"""
+        if not config.FILTER_LANGUAGE_SELECTORS:
+            return True
+        
+        # 2글자 대문자 코드는 언어/국가 선택기로 간주
+        if len(text) <= 2 and text.isupper():
+            return False
+        
+        # 일반적인 언어 코드 목록
+        language_codes = [
+            'AR', 'DZ', 'EG', 'JO', 'MA', 'SA', 'AZ', 'BG', 'BN', 'CS', 'DA', 
+            'AT', 'CH', 'DE', 'GR', 'CA', 'ET', 'GH', 'IE', 'IN', 'KE', 'LK', 
+            'LU', 'NG', 'PH', 'ZA', 'TZ', 'UG', 'ZM', 'ZW', 'ES', 'FR', 'IT',
+            'PT', 'RU', 'TR', 'UK', 'PL', 'NL', 'SE', 'NO', 'FI', 'DK', 'JP',
+            'KR', 'CN', 'TH', 'VN', 'ID', 'MY', 'SG', 'PK', 'BD', 'LK', 'NP'
+        ]
+        
+        if text.strip() in language_codes:
+            return False
+        
+        # URL이 언어/국가 경로인 경우
+        if href:
+            country_paths = ['/algeria/', '/egypt/', '/jordan/', '/morocco/', '/saudi/', 
+                           '/bangladesh/', '/ethiopia/', '/ghana/', '/ireland/', '/india/',
+                           '/kenya/', '/sri-lanka/', '/nigeria/', '/philippines/', '/switzerland/']
+            if any(path in href.lower() for path in country_paths):
+                return False
+        
+        return True
+    
     def extract_interactive_elements(self):
         """
         화면 내의 클릭 가능한 요소(버튼, 링크 등)를 찾아 스크린샷과 동작 정보를 추출합니다.
@@ -103,8 +124,6 @@ class BrowserManager:
         interactive_data = []
 
         selectors = "a, button, input[type='submit'], input[type='button'], [role='button'], [onclick]"
-        # 분석 대상: a 태그, button 태그, input(submit/button) 태그
-        # 너무 많을 수 있으므로 상위 20개 정도만 제한하거나, 특정 크기 이상인 것만 필터링 가능
         elements = self.page.query_selector_all(selectors)
 
         print(f"[Browser] Found {len(elements)} potential elements. Filtering...")
@@ -113,7 +132,8 @@ class BrowserManager:
         saved_hashes = set()
 
         for i, elem in enumerate(elements):
-            if count >= 30: break  # 보고서 용량 문제로 최대 20개까지만 분석 (조절 가능)
+            if count >= config.MAX_INTERACTIVE_ELEMENTS: 
+                break
 
             try:
                 # 1. 요소가 화면에 보이는지 확인 (안 보이면 스킵)
@@ -137,12 +157,16 @@ class BrowserManager:
                             text = f"[{elem.get_attribute('class') or elem.get_attribute('id') or 'Unknown Button'}]"
 
                 text = text[:50].replace("\n", " ")
+                
+                # 2.5. 의미 없는 요소 필터링 (언어 선택기 등)
+                href = elem.get_attribute('href')
+                if not self._is_meaningful_element(text, href or ''):
+                    continue
 
                 # 3. 동작(Action) 정보 추출
                 tag_name = elem.evaluate("el => el.tagName").lower()
                 action_info = "Click Action"
 
-                href = elem.get_attribute('href')
                 onclick = elem.get_attribute('onclick')
 
                 if href and href != "#":
