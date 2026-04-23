@@ -3,6 +3,8 @@ from playwright.sync_api import sync_playwright, Page, Browser, BrowserContext
 import time
 import sys
 import os
+import json
+import winreg  # Windows Registry access
 
 # 상위 폴더의 config를 임포트하기 위해 경로 추가
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -15,31 +17,206 @@ class BrowserManager:
         self.browser: Browser = None
         self.context: BrowserContext = None
         self.page: Page = None
+        self.user_config_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "user_config.json"
+        )
+
+    def _load_user_config(self):
+        """Load user configuration from user_config.json if it exists."""
+        if os.path.exists(self.user_config_path):
+            try:
+                with open(self.user_config_path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except Exception as e:
+                print(f"[Browser] Warning: Could not load user_config.json: {e}")
+        return {}
+
+    def _save_user_config(self, chrome_path=None, use_playwright_chromium=False):
+        """Save user's Chrome preference to user_config.json."""
+        config_data = {
+            "chrome_path": chrome_path,
+            "use_playwright_chromium": use_playwright_chromium
+        }
+        try:
+            with open(self.user_config_path, 'w', encoding='utf-8') as f:
+                json.dump(config_data, f, indent=2)
+            print(f"[Browser] Saved preference to {self.user_config_path}")
+        except Exception as e:
+            print(f"[Browser] Warning: Could not save user_config.json: {e}")
+
+    def _check_registry_chrome(self):
+        """Check Windows Registry for Chrome installation path."""
+        try:
+            # Try HKEY_LOCAL_MACHINE first
+            key_path = r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe"
+            try:
+                key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key_path)
+                chrome_path, _ = winreg.QueryValueEx(key, "")
+                winreg.CloseKey(key)
+                if os.path.exists(chrome_path):
+                    return chrome_path
+            except WindowsError:
+                pass
+
+            # Try HKEY_CURRENT_USER
+            try:
+                key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path)
+                chrome_path, _ = winreg.QueryValueEx(key, "")
+                winreg.CloseKey(key)
+                if os.path.exists(chrome_path):
+                    return chrome_path
+            except WindowsError:
+                pass
+        except Exception as e:
+            pass
+        return None
+
+    def _find_chrome_auto(self):
+        """Auto-detect Chrome installation. Returns path if found, None otherwise."""
+        print("[Browser] Auto-detecting Chrome installation...")
+        
+        # List of paths to check
+        search_paths = []
+        
+        # 1. Check Windows Registry (most reliable)
+        registry_path = self._check_registry_chrome()
+        if registry_path:
+            search_paths.append(("Windows Registry", registry_path))
+        
+        # 2. Common installation paths
+        common_paths = [
+            os.path.join(os.environ.get('ProgramFiles', 'C:\\Program Files'), 
+                        'Google', 'Chrome', 'Application', 'chrome.exe'),
+            os.path.join(os.environ.get('ProgramFiles(x86)', 'C:\\Program Files (x86)'), 
+                        'Google', 'Chrome', 'Application', 'chrome.exe'),
+            os.path.join(os.environ.get('LOCALAPPDATA', ''), 
+                        'Google', 'Chrome', 'Application', 'chrome.exe'),
+        ]
+        
+        for path in common_paths:
+            if path:
+                search_paths.append(("Common Path", path))
+        
+        # 3. Bundled Chrome (for EXE distribution)
+        if getattr(sys, 'frozen', False):
+            base_dir = os.path.dirname(sys.executable)
+            bundled_path = os.path.join(base_dir, "chrome-win64", "chrome.exe")
+            search_paths.append(("Bundled Chrome", bundled_path))
+        
+        # Check each path
+        for source, path in search_paths:
+            if os.path.exists(path):
+                print(f"[Browser] ✓ Found Chrome via {source}: {path}")
+                return path
+            else:
+                print(f"[Browser] ✗ Not found: {path}")
+        
+        print("[Browser] ⚠️ Chrome not found in any standard location")
+        return None
+
+    def _validate_chrome_path(self, path):
+        """Validate that the given path is a valid Chrome executable."""
+        if not path:
+            return False
+        
+        # Normalize path
+        path = path.strip().strip('"').strip("'")
+        
+        # Check if file exists
+        if not os.path.exists(path):
+            return False
+        
+        # Check if it's a file (not directory)
+        if not os.path.isfile(path):
+            return False
+        
+        # Check if it's an executable (.exe)
+        if not path.lower().endswith('.exe'):
+            return False
+        
+        return True
+
+    def _prompt_user_for_chrome(self):
+        """Interactive prompt for user to choose Chrome option."""
+        print("\n" + "="*70)
+        print("⚠️  Chrome Browser Not Found!")
+        print("="*70)
+        print("\nPlease choose an option:")
+        print("  [1] Use Playwright's Chromium (recommended, works offline)")
+        print("  [2] Provide custom Chrome path")
+        print()
+        
+        while True:
+            choice = input("Your choice (1 or 2): ").strip()
+            
+            if choice == "1":
+                print("[Browser] Using Playwright's bundled Chromium")
+                self._save_user_config(use_playwright_chromium=True)
+                return None  # None means use Playwright's Chromium
+            
+            elif choice == "2":
+                print("\nPlease enter the full path to chrome.exe")
+                print("Example: C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe")
+                
+                while True:
+                    path = input("\nChrome path: ").strip().strip('"').strip("'")
+                    
+                    if self._validate_chrome_path(path):
+                        print(f"[Browser] ✓ Valid Chrome path: {path}")
+                        self._save_user_config(chrome_path=path)
+                        return path
+                    else:
+                        print("❌ Error: Invalid path or file not found")
+                        print("   Please enter a valid chrome.exe path")
+                        print("   Or press Ctrl+C to exit and restart")
+            else:
+                print("Invalid choice. Please enter 1 or 2.")
 
     def launch_browser(self):
         """브라우저를 실행하고 설정을 적용합니다."""
         print("[Browser] Launching browser...")
         self.playwright = sync_playwright().start()
 
-        # EXE 실행 시 커스텀 Chrome 경로 설정
         executable_path = None
-        if getattr(sys, 'frozen', False):
-            # EXE 실행 시 기준 경로
-            base_dir = os.path.dirname(sys.executable)
-            # USB 안의 browsers 폴더 경로 지정
-            executable_path = os.path.join(base_dir, "chrome-win64", "chrome.exe")
-
-            if os.path.exists(executable_path):
-                print(f"[Browser] Using custom Chrome: {executable_path}")
+        
+        # Step 1: Load user config (if exists)
+        user_config = self._load_user_config()
+        
+        if user_config.get("use_playwright_chromium"):
+            # User previously chose to use Playwright's Chromium
+            print("[Browser] Using Playwright's Chromium (user preference)")
+            executable_path = None
+        
+        elif user_config.get("chrome_path"):
+            # User previously provided a custom Chrome path
+            saved_path = user_config.get("chrome_path")
+            if self._validate_chrome_path(saved_path):
+                print(f"[Browser] Using saved Chrome path: {saved_path}")
+                executable_path = saved_path
             else:
-                print(f"⚠️ Warning: Custom Chrome not found at {executable_path}")
-                print("[Browser] Falling back to Playwright's bundled Chromium...")
-                executable_path = None  # Playwright will use bundled Chromium
+                print(f"[Browser] ⚠️ Saved Chrome path no longer valid: {saved_path}")
+                print("[Browser] Will attempt auto-detection...")
+                executable_path = self._find_chrome_auto()
+                
+                if not executable_path:
+                    executable_path = self._prompt_user_for_chrome()
+        
+        else:
+            # Step 2: No saved config, try auto-detection
+            executable_path = self._find_chrome_auto()
+            
+            # Step 3: If auto-detection failed, prompt user
+            if not executable_path:
+                executable_path = self._prompt_user_for_chrome()
 
-        # 브라우저 실행 (통합된 코드)
+        # 브라우저 실행
         launch_options = {"headless": config.HEADLESS_MODE}
         if executable_path:
             launch_options["executable_path"] = executable_path
+            print(f"[Browser] Launching Chrome: {executable_path}")
+        else:
+            print("[Browser] Launching Playwright's bundled Chromium")
         
         self.browser = self.playwright.chromium.launch(**launch_options)
 

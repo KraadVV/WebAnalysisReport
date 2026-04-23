@@ -1,5 +1,65 @@
 # Changelog - Web Analysis Report Tool
 
+## Version 2.2 - Intelligent Chrome Auto-Detection (2026-04-23)
+
+### 🎉 Major New Feature
+
+#### **Smart Chrome Browser Detection System**
+- **Auto-Detection**: Automatically finds Chrome installation on Windows
+  - Windows Registry lookup (most reliable method)
+  - Common installation path scanning
+  - Bundled Chrome detection (for EXE distribution)
+- **Interactive User Prompts**: When Chrome not found, users can:
+  - Choose to use Playwright's Chromium (safe fallback)
+  - Provide custom Chrome path with validation
+- **Config Persistence**: User preferences saved to `user_config.json`
+  - Remembers user's choice for future runs
+  - Auto-validates saved paths
+  - Graceful fallback if saved path becomes invalid
+- **Path Validation**: Comprehensive validation of custom Chrome paths
+  - File existence check
+  - Executable verification
+  - User-friendly error messages with retry loop
+
+### 🔧 Technical Improvements
+
+**Enhanced `browser_handler.py`:**
+- Added `_load_user_config()` - Load saved preferences
+- Added `_save_user_config()` - Persist user choices
+- Added `_check_registry_chrome()` - Windows Registry lookup
+- Added `_find_chrome_auto()` - Multi-tier auto-detection
+- Added `_validate_chrome_path()` - Path validation
+- Added `_prompt_user_for_chrome()` - Interactive user prompts
+- Refactored `launch_browser()` - Integrated new detection flow
+
+**Updated `.gitignore`:**
+- Added `user_config.json` to prevent committing user-specific paths
+
+### 📝 New Documentation
+
+- **`CHROME_DETECTION.md`** - Comprehensive guide covering:
+  - Detection flow and logic
+  - User experience scenarios
+  - Configuration file format
+  - Troubleshooting guide
+  - Developer documentation
+
+### 🎯 Benefits
+
+✅ **Zero friction** - Auto-detects Chrome for most users  
+✅ **User-friendly** - Clear prompts when needed  
+✅ **Persistent** - Remembers user's choice  
+✅ **Flexible** - Supports custom Chrome locations  
+✅ **Safe fallback** - Playwright Chromium always available  
+✅ **Portable** - Works with USB/portable Chrome installations  
+
+### 🐛 Problem Solved
+
+**Issue**: Users with Chrome installed in non-standard locations couldn't use the tool  
+**Solution**: Multi-tier detection system with user prompts and config persistence
+
+---
+
 ## Version 2.1 - Advanced SNS Intelligence (2026-04-23)
 
 ### 🎉 Major New Features

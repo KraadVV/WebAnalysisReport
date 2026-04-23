@@ -63,6 +63,9 @@ chrome-win64/
 secrets.json
 config.local.py
 
+# User-specific configuration
+user_config.json
+
 # Test and temporary files
 test_*.py
 temp/
